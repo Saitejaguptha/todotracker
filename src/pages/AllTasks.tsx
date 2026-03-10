@@ -1,17 +1,23 @@
 import React, { useState, useMemo } from 'react';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { type RootState } from '../store';
 import { FiLayers, FiSearch } from 'react-icons/fi';
 import TaskCard from '../components/features/TaskCard';
 import TaskModal from '../components/features/TaskModal';
-import { type Task } from '../store/tasksSlice';
+import { updateTask, deleteTask, toggleTaskStatus, type Task } from '../store/tasksSlice';
+import { addActivity } from '../store/activitySlice';
+import { toast } from 'react-hot-toast';
 
 const AllTasks: React.FC = () => {
     const tasks = useSelector((state: RootState) => state.tasks.items);
+    const auth = useSelector((state: RootState) => state.auth);
+    const dispatch = useDispatch();
+
     const { searchByDescription } = useSelector((state: RootState) => state.settings);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedTask, setSelectedTask] = useState<Task | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [modalMode, setModalMode] = useState<'VIEW' | 'EDIT' | 'DELETE'>('VIEW');
 
     const filteredTasks = useMemo(() => {
         const query = searchQuery.toLowerCase();
@@ -26,7 +32,69 @@ const AllTasks: React.FC = () => {
 
     const handleTaskClick = (task: Task) => {
         setSelectedTask(task);
+        setModalMode('VIEW');
         setIsModalOpen(true);
+    };
+
+    const handleEdit = (task: Task) => {
+        setSelectedTask(task);
+        setModalMode('EDIT');
+        setIsModalOpen(true);
+    };
+
+    const handleDelete = (id: string) => {
+        const task = tasks.find(t => t.id === id);
+        if (task) {
+            setSelectedTask(task);
+            setModalMode('DELETE');
+            setIsModalOpen(true);
+        }
+    };
+
+    const handleAction = (action: 'UPDATE' | 'TOGGLE' | 'DELETE' | 'EDIT', data?: Partial<Task>) => {
+        if (!selectedTask) return;
+
+        if (action === 'EDIT') {
+            setModalMode('EDIT');
+            return;
+        }
+
+        if (action === 'TOGGLE') {
+            dispatch(toggleTaskStatus(selectedTask.id));
+            const newStatus = selectedTask.status === 'DONE' ? 'PENDING' : 'DONE';
+            dispatch(addActivity({
+                type: 'updated',
+                message: `Marked task as ${newStatus.toLowerCase()}: ${selectedTask.title}`,
+                user_id: auth.currentUser?.id || ''
+            }));
+            toast.success(`Task marked as ${newStatus.toLowerCase()}`);
+            setIsModalOpen(false);
+            return;
+        }
+
+        if (action === 'DELETE') {
+            dispatch(deleteTask(selectedTask.id));
+            dispatch(addActivity({
+                type: 'deleted',
+                message: `Deleted task: ${selectedTask.title}`,
+                user_id: auth.currentUser?.id || ''
+            }));
+            toast.success('Task deleted permanently');
+            setIsModalOpen(false);
+            return;
+        }
+
+        if (action === 'UPDATE' && data) {
+            const updatedTask = { ...selectedTask, ...data };
+            dispatch(updateTask(updatedTask));
+            dispatch(addActivity({
+                type: 'updated',
+                message: `Updated task details: ${updatedTask.title}`,
+                user_id: auth.currentUser?.id || ''
+            }));
+            toast.success('Task updated successfully');
+            setIsModalOpen(false);
+        }
     };
 
     return (
@@ -65,6 +133,9 @@ const AllTasks: React.FC = () => {
                         <TaskCard
                             key={task.id}
                             task={task}
+                            showActions={true}
+                            onEdit={handleEdit}
+                            onDelete={handleDelete}
                             onClick={handleTaskClick}
                         />
                     ))
@@ -75,6 +146,8 @@ const AllTasks: React.FC = () => {
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
                 task={selectedTask}
+                mode={modalMode}
+                onAction={handleAction}
             />
         </div>
     );

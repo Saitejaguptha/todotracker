@@ -3,9 +3,10 @@ import { useSelector, useDispatch } from 'react-redux';
 import { toast } from 'react-hot-toast';
 import { FiSearch, FiTrash2 } from 'react-icons/fi';
 import { type RootState } from '../store';
-import { deleteTask } from '../store/tasksSlice';
+import { deleteTask, type Task } from '../store/tasksSlice';
 import { addActivity } from '../store/activitySlice';
 import TaskCard from '../components/features/TaskCard';
+import TaskModal from '../components/features/TaskModal';
 
 const DeleteTask: React.FC = () => {
     const tasks = useSelector((state: RootState) => state.tasks.items);
@@ -13,6 +14,8 @@ const DeleteTask: React.FC = () => {
     const dispatch = useDispatch();
     const { searchByDescription } = useSelector((state: RootState) => state.settings);
     const [searchQuery, setSearchQuery] = useState('');
+    const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+    const [isModalOpen, setIsModalOpen] = useState(false);
 
     const filteredTasks = useMemo(() => {
         const query = searchQuery.toLowerCase();
@@ -25,13 +28,17 @@ const DeleteTask: React.FC = () => {
         });
     }, [tasks, searchQuery, searchByDescription]);
 
-    const handleDelete = (id: string) => {
-        const taskToDelete = tasks.find(t => t.id === id);
-        if (taskToDelete) {
-            dispatch(deleteTask(id));
+    const handleTaskClick = (task: Task) => {
+        setSelectedTask(task);
+        setIsModalOpen(true);
+    };
+
+    const handleAction = (action: string) => {
+        if (action === 'DELETE' && selectedTask) {
+            dispatch(deleteTask(selectedTask.id));
             dispatch(addActivity({
                 type: 'deleted',
-                message: `Permanently deleted task: ${taskToDelete.title}`,
+                message: `Permanently deleted task: ${selectedTask.title}`,
                 user_id: auth.currentUser?.id || ''
             }));
             toast.error('Task deleted successfully');
@@ -41,7 +48,10 @@ const DeleteTask: React.FC = () => {
     return (
         <div className="w-full max-w-5xl mx-auto px-4 md:px-6 py-4 md:py-8 flex flex-col h-full overflow-hidden">
             <div className="flex flex-col gap-1 mb-6 md:mb-8 pb-4 border-b border-indigo-100">
-                <h2 className="text-xl md:text-2xl font-bold text-red-900 tracking-tight">Delete Tasks</h2>
+                <div className="flex items-center gap-3">
+                    <FiTrash2 className="text-red-900" size={24} />
+                    <h2 className="text-xl md:text-2xl font-bold text-red-900 tracking-tight">Delete Tasks</h2>
+                </div>
                 <p className="text-xs md:text-sm text-gray-500 font-medium">Search for tasks you want to permanently remove</p>
             </div>
 
@@ -70,24 +80,23 @@ const DeleteTask: React.FC = () => {
                     </div>
                 ) : (
                     filteredTasks.map(task => (
-                        <div key={task.id} className="relative group">
-                            <TaskCard
-                                task={task}
-                                showActions={false}
-                            />
-                            <div className="absolute right-3 md:right-5 top-1/2 -translate-y-1/2">
-                                <button
-                                    onClick={() => handleDelete(task.id)}
-                                    className="p-2 md:p-3 bg-red-50 text-red-600 rounded-xl hover:bg-red-600 hover:text-white transition-all shadow-sm flex items-center gap-2 font-bold text-xs md:text-sm"
-                                    title="Delete Task"
-                                >
-                                    <FiTrash2 size={16} className="md:size-[18px]" /> <span className="hidden sm:inline">Delete</span>
-                                </button>
-                            </div>
-                        </div>
+                        <TaskCard
+                            key={task.id}
+                            task={task}
+                            showActions={false}
+                            onClick={handleTaskClick}
+                        />
                     ))
                 )}
             </div>
+
+            <TaskModal
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                task={selectedTask}
+                mode="DELETE"
+                onAction={handleAction}
+            />
         </div>
     );
 };

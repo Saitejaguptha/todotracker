@@ -53,10 +53,10 @@ const Sidebar: React.FC = () => {
 
             <div className="flex-1 overflow-y-auto py-4 flex flex-col gap-1">
                 <SidebarItem icon={FiPlusCircle} text="Create Task" to="/app/create" />
+                <SidebarItem icon={FiList} text="All Tasks" to="/app/all" />
                 <SidebarItem icon={FiEdit} text="Edit Task" to="/app/edit" />
                 <SidebarItem icon={FiClock} text="Pending Tasks" to="/app/pending" />
                 <SidebarItem icon={FiCheckCircle} text="Recently Completed Tasks" to="/app/completed" />
-                <SidebarItem icon={FiList} text="All Tasks" to="/app/all" />
                 <SidebarItem icon={FiTrash2} text="Delete Task" to="/app/delete" />
                 <SidebarItem icon={FiActivity} text="Recent Activity" to="/app/activity" />
             </div>

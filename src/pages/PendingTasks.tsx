@@ -1,14 +1,22 @@
 import React, { useState, useMemo } from 'react';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { type RootState } from '../store';
 import TaskCard from '../components/features/TaskCard';
-import { FiSearch } from 'react-icons/fi';
+import TaskModal from '../components/features/TaskModal';
+import { FiSearch, FiClock } from 'react-icons/fi';
+import { toggleTaskStatus, type Task } from '../store/tasksSlice';
+import { addActivity } from '../store/activitySlice';
+import { toast } from 'react-hot-toast';
 
 const PendingTasks: React.FC = () => {
     const tasks = useSelector((state: RootState) => state.tasks.items);
+    const auth = useSelector((state: RootState) => state.auth);
+    const dispatch = useDispatch();
 
     const { searchByDescription } = useSelector((state: RootState) => state.settings);
     const [searchQuery, setSearchQuery] = useState('');
+    const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+    const [isModalOpen, setIsModalOpen] = useState(false);
 
     const filteredPendingTasks = useMemo(() => {
         const query = searchQuery.toLowerCase();
@@ -23,10 +31,30 @@ const PendingTasks: React.FC = () => {
             });
     }, [tasks, searchQuery, searchByDescription]);
 
+    const handleTaskClick = (task: Task) => {
+        setSelectedTask(task);
+        setIsModalOpen(true);
+    };
+
+    const handleAction = (action: string) => {
+        if (action === 'TOGGLE' && selectedTask) {
+            dispatch(toggleTaskStatus(selectedTask.id));
+            dispatch(addActivity({
+                type: 'updated',
+                message: `Marked task as done: ${selectedTask.title}`,
+                user_id: auth.currentUser?.id || ''
+            }));
+            toast.success('Task marked as done!');
+        }
+    };
+
     return (
         <div className="w-full max-w-5xl mx-auto px-4 md:px-6 py-4 md:py-8 flex flex-col h-full overflow-hidden">
             <div className="flex flex-col gap-1 mb-6 md:mb-8 pb-4 border-b border-indigo-100">
-                <h2 className="text-xl md:text-2xl font-bold text-indigo-900 tracking-tight">Pending Tasks</h2>
+                <div className="flex items-center gap-3">
+                    <FiClock className="text-amber-600" size={24} />
+                    <h2 className="text-xl md:text-2xl font-bold text-indigo-900 tracking-tight">Pending Tasks</h2>
+                </div>
                 <p className="text-xs md:text-sm text-gray-500 font-medium">Tasks currently in progress</p>
             </div>
 
@@ -51,10 +79,24 @@ const PendingTasks: React.FC = () => {
                     </div>
                 ) : (
                     filteredPendingTasks.map(task => (
-                        <TaskCard key={task.id} task={task} variant="pending" />
+                        <TaskCard
+                            key={task.id}
+                            task={task}
+                            variant="pending"
+                            showActions={true}
+                            onClick={handleTaskClick}
+                        />
                     ))
                 )}
             </div>
+
+            <TaskModal
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                task={selectedTask}
+                mode="PENDING"
+                onAction={handleAction}
+            />
         </div>
     );
 };

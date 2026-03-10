@@ -28,21 +28,6 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onEdit, onDelete, onClick, sh
 
     const handleToggle = (e: React.MouseEvent) => {
         e.stopPropagation();
-        if (variant === 'completed' && task.status === 'DONE') {
-            toast('Task is already completed!', {
-                icon: '✅',
-                style: { borderRadius: '10px', background: '#333', color: '#fff' },
-            });
-            return;
-        }
-        if (variant === 'pending' && task.status === 'PENDING') {
-            toast('Task is already pending!', {
-                icon: '⏳',
-                style: { borderRadius: '10px', background: '#333', color: '#fff' },
-            });
-            return;
-        }
-
         const newStatus = task.status === 'DONE' ? 'PENDING' : 'DONE';
         dispatch(toggleTaskStatus(task.id));
         dispatch(addActivity({
@@ -50,6 +35,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onEdit, onDelete, onClick, sh
             message: `Task "${task.title}" marked as ${newStatus.toLowerCase()}`,
             user_id: userId || ''
         }));
+        toast.success(`Task marked as ${newStatus.toLowerCase()}`);
     };
 
     const handleMarkAsPending = (e: React.MouseEvent) => {
@@ -116,43 +102,45 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onEdit, onDelete, onClick, sh
             </div>
 
             <div className="flex items-center justify-end gap-2 sm:shrink-0">
-                {isCompletedVariant ? (
-                    <button
-                        onClick={handleMarkAsPending}
-                        className="flex-1 sm:flex-none px-3 py-1.5 text-[11px] md:text-xs font-bold bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 transition-all flex items-center justify-center gap-1.5"
-                    >
-                        <FiRotateCcw size={12} /> <span className="whitespace-nowrap">Mark Pending</span>
-                    </button>
-                ) : isPendingVariant ? (
-                    <button
-                        onClick={handleMarkAsDone}
-                        className="flex-1 sm:flex-none px-3 py-1.5 text-[11px] md:text-xs font-bold bg-emerald-100 text-emerald-700 rounded-lg hover:bg-emerald-200 transition-all flex items-center justify-center gap-1.5"
-                    >
-                        <FiCheckCircle size={12} /> <span className="whitespace-nowrap">Mark Done</span>
-                    </button>
-                ) : (
-                    showActions && (
-                        <div className="flex items-center gap-1 md:gap-2">
-                            {onEdit && (
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); onEdit(task); }}
-                                    className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                                    title="Edit Task"
-                                >
-                                    <FiEdit2 size={18} />
-                                </button>
-                            )}
-                            {onDelete && (
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); onDelete(task.id); }}
-                                    className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                                    title="Delete Task"
-                                >
-                                    <FiTrash2 size={18} />
-                                </button>
-                            )}
-                        </div>
-                    )
+                {showActions && (
+                    <>
+                        {isCompletedVariant ? (
+                            <button
+                                onClick={handleMarkAsPending}
+                                className="flex-1 sm:flex-none px-3 py-1.5 text-[11px] md:text-xs font-bold bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 transition-all flex items-center justify-center gap-1.5"
+                            >
+                                <FiRotateCcw size={12} /> <span className="whitespace-nowrap">Mark Pending</span>
+                            </button>
+                        ) : isPendingVariant ? (
+                            <button
+                                onClick={handleMarkAsDone}
+                                className="flex-1 sm:flex-none px-3 py-1.5 text-[11px] md:text-xs font-bold bg-emerald-100 text-emerald-700 rounded-lg hover:bg-emerald-200 transition-all flex items-center justify-center gap-1.5"
+                            >
+                                <FiCheckCircle size={12} /> <span className="whitespace-nowrap">Mark Done</span>
+                            </button>
+                        ) : (
+                            <div className="flex items-center gap-1 md:gap-2">
+                                {onEdit && (
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); onEdit(task); }}
+                                        className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                                        title="Edit Task"
+                                    >
+                                        <FiEdit2 size={18} />
+                                    </button>
+                                )}
+                                {onDelete && (
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); onDelete(task.id); }}
+                                        className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                        title="Delete Task"
+                                    >
+                                        <FiTrash2 size={18} />
+                                    </button>
+                                )}
+                            </div>
+                        )}
+                    </>
                 )}
             </div>
         </div>
@@ -160,3 +148,4 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onEdit, onDelete, onClick, sh
 };
 
 export default TaskCard;
+

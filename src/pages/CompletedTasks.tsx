@@ -1,14 +1,22 @@
 import React, { useState, useMemo } from 'react';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { type RootState } from '../store';
 import TaskCard from '../components/features/TaskCard';
+import TaskModal from '../components/features/TaskModal';
 import { FiCheckCircle, FiSearch } from 'react-icons/fi';
+import { toggleTaskStatus, type Task } from '../store/tasksSlice';
+import { addActivity } from '../store/activitySlice';
+import { toast } from 'react-hot-toast';
 
 const CompletedTasks: React.FC = () => {
     const tasks = useSelector((state: RootState) => state.tasks.items);
+    const auth = useSelector((state: RootState) => state.auth);
+    const dispatch = useDispatch();
 
     const { searchByDescription } = useSelector((state: RootState) => state.settings);
     const [searchQuery, setSearchQuery] = useState('');
+    const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+    const [isModalOpen, setIsModalOpen] = useState(false);
 
     const filteredCompletedTasks = useMemo(() => {
         const query = searchQuery.toLowerCase();
@@ -22,6 +30,23 @@ const CompletedTasks: React.FC = () => {
                 return matchesTitle;
             });
     }, [tasks, searchQuery, searchByDescription]);
+
+    const handleTaskClick = (task: Task) => {
+        setSelectedTask(task);
+        setIsModalOpen(true);
+    };
+
+    const handleAction = (action: string) => {
+        if (action === 'TOGGLE' && selectedTask) {
+            dispatch(toggleTaskStatus(selectedTask.id));
+            dispatch(addActivity({
+                type: 'updated',
+                message: `Marked task as pending: ${selectedTask.title}`,
+                user_id: auth.currentUser?.id || ''
+            }));
+            toast.success('Task marked as pending');
+        }
+    };
 
     return (
         <div className="w-full max-w-5xl mx-auto px-4 md:px-6 py-4 md:py-8 flex flex-col h-full overflow-hidden">
@@ -54,10 +79,24 @@ const CompletedTasks: React.FC = () => {
                     </div>
                 ) : (
                     filteredCompletedTasks.map(task => (
-                        <TaskCard key={task.id} task={task} variant="completed" />
+                        <TaskCard
+                            key={task.id}
+                            task={task}
+                            variant="completed"
+                            showActions={true}
+                            onClick={handleTaskClick}
+                        />
                     ))
                 )}
             </div>
+
+            <TaskModal
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                task={selectedTask}
+                mode="COMPLETED"
+                onAction={handleAction}
+            />
         </div>
     );
 };
