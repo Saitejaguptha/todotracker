@@ -4,24 +4,24 @@ import Header from './Header';
 import Sidebar from './Sidebar';
 import Footer from './Footer';
 import { useSelector, useDispatch } from 'react-redux';
-import { type RootState } from '../../store';
 import { setSidebarOpen } from '../../store/uiSlice';
-import { loadUserTasks } from '../../store/tasksSlice';
+import { fetchTasks } from '../../store/tasksSlice';
 import { loadUserActivities } from '../../store/activitySlice';
+import { type RootState, type AppDispatch } from '../../store';
 
 const SlackLayout: React.FC = () => {
     const isSidebarOpen = useSelector((state: RootState) => state.ui.isSidebarOpen);
     const currentUser = useSelector((state: RootState) => state.auth.currentUser);
-    const tasksLoaded = useSelector((state: RootState) => state.tasks.currentUserEmail);
-    const dispatch = useDispatch();
+    const loadedUserId = useSelector((state: RootState) => state.tasks.loadedUserId);
+    const dispatch = useDispatch<AppDispatch>();
 
     // Handle page refresh: if user is logged in but data isn't loaded yet, load it now
     React.useEffect(() => {
-        if (currentUser?.email && !tasksLoaded) {
-            dispatch(loadUserTasks(currentUser.email));
+        if (currentUser?.id && loadedUserId !== currentUser.id) {
+            dispatch(fetchTasks(currentUser.id));
             dispatch(loadUserActivities(currentUser.email));
         }
-    }, [currentUser?.email, tasksLoaded, dispatch]);
+    }, [currentUser, loadedUserId, dispatch]);
 
     return (
         <div className="flex flex-col h-[100dvh] max-h-[100dvh] w-full overflow-hidden bg-indigo-50 text-gray-900 font-sans">

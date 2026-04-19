@@ -3,8 +3,8 @@ import { useForm, type SubmitHandler } from 'react-hook-form';
 import { toast } from 'react-hot-toast';
 import { FiEdit2, FiSave, FiUser, FiMail, FiLock } from 'react-icons/fi';
 import { useSelector, useDispatch } from 'react-redux';
-import { type RootState } from '../store';
-import { updateProfile } from '../store/authSlice';
+import { updateProfileAsync } from '../store/authSlice';
+import { type RootState, type AppDispatch } from '../store';
 
 type ProfileFormInputs = {
     name: string;
@@ -17,7 +17,7 @@ type ProfileFormInputs = {
 const Profile: React.FC = () => {
     const auth = useSelector((state: RootState) => state.auth);
     const user = auth.currentUser || { id: '', name: 'Guest', email: '', gender: 'other' as const };
-    const dispatch = useDispatch();
+    const dispatch = useDispatch<AppDispatch>();
     const [isEditing, setIsEditing] = useState(false);
     const [isChangingPassword, setIsChangingPassword] = useState(false);
     // const isLoading = auth.loading;
@@ -53,7 +53,7 @@ const Profile: React.FC = () => {
         }
     };
 
-    const onSubmit: SubmitHandler<ProfileFormInputs> = (data) => {
+    const onSubmit: SubmitHandler<ProfileFormInputs> = async (data) => {
         const updateData: any = {
             id: user.id,
             name: data.name,
@@ -65,10 +65,14 @@ const Profile: React.FC = () => {
             updateData.password = data.newPassword;
         }
 
-        dispatch(updateProfile(updateData));
-        toast.success('Profile details updated successfully!');
-        setIsEditing(false);
-        setIsChangingPassword(false);
+        try {
+            await dispatch(updateProfileAsync(updateData)).unwrap();
+            toast.success('Profile details updated successfully!');
+            setIsEditing(false);
+            setIsChangingPassword(false);
+        } catch (error: any) {
+            toast.error(error || 'Failed to update profile');
+        }
     };
 
     return (

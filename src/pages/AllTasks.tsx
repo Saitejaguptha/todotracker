@@ -1,17 +1,17 @@
 import React, { useState, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { type RootState } from '../store';
 import { FiLayers, FiSearch } from 'react-icons/fi';
 import TaskCard from '../components/features/TaskCard';
 import TaskModal from '../components/features/TaskModal';
-import { updateTask, deleteTask, toggleTaskStatus, type Task } from '../store/tasksSlice';
+import { updateTaskAsync, deleteTaskAsync, toggleTaskStatusAsync, type Task } from '../store/tasksSlice';
 import { addActivity } from '../store/activitySlice';
 import { toast } from 'react-hot-toast';
+import { type RootState, type AppDispatch } from '../store';
 
 const AllTasks: React.FC = () => {
     const tasks = useSelector((state: RootState) => state.tasks.items);
     const auth = useSelector((state: RootState) => state.auth);
-    const dispatch = useDispatch();
+    const dispatch = useDispatch<AppDispatch>();
 
     const { searchByDescription } = useSelector((state: RootState) => state.settings);
     const [searchQuery, setSearchQuery] = useState('');
@@ -51,7 +51,7 @@ const AllTasks: React.FC = () => {
         }
     };
 
-    const handleAction = (action: 'UPDATE' | 'TOGGLE' | 'DELETE' | 'EDIT', data?: Partial<Task>) => {
+    const handleAction = async (action: 'UPDATE' | 'TOGGLE' | 'DELETE' | 'EDIT', data?: Partial<Task>) => {
         if (!selectedTask) return;
 
         if (action === 'EDIT') {
@@ -60,40 +60,52 @@ const AllTasks: React.FC = () => {
         }
 
         if (action === 'TOGGLE') {
-            dispatch(toggleTaskStatus(selectedTask.id));
-            const newStatus = selectedTask.status === 'DONE' ? 'PENDING' : 'DONE';
-            dispatch(addActivity({
-                type: 'updated',
-                message: `Marked task as ${newStatus.toLowerCase()}: ${selectedTask.title}`,
-                user_id: auth.currentUser?.id || ''
-            }));
-            toast.success(`Task marked as ${newStatus.toLowerCase()}`);
-            setIsModalOpen(false);
+            try {
+                await dispatch(toggleTaskStatusAsync({ id: selectedTask.id, status: selectedTask.status })).unwrap();
+                const newStatus = selectedTask.status === 'DONE' ? 'PENDING' : 'DONE';
+                dispatch(addActivity({
+                    type: 'updated',
+                    message: `Marked task as ${newStatus.toLowerCase()}: ${selectedTask.title}`,
+                    user_id: auth.currentUser?.id || ''
+                }));
+                toast.success(`Task marked as ${newStatus.toLowerCase()}`);
+                setIsModalOpen(false);
+            } catch (error: any) {
+                toast.error(error || 'Failed to update task status');
+            }
             return;
         }
 
         if (action === 'DELETE') {
-            dispatch(deleteTask(selectedTask.id));
-            dispatch(addActivity({
-                type: 'deleted',
-                message: `Deleted task: ${selectedTask.title}`,
-                user_id: auth.currentUser?.id || ''
-            }));
-            toast.success('Task deleted permanently');
-            setIsModalOpen(false);
+            try {
+                await dispatch(deleteTaskAsync(selectedTask.id)).unwrap();
+                dispatch(addActivity({
+                    type: 'deleted',
+                    message: `Deleted task: ${selectedTask.title}`,
+                    user_id: auth.currentUser?.id || ''
+                }));
+                toast.success('Task deleted permanently');
+                setIsModalOpen(false);
+            } catch (error: any) {
+                toast.error(error || 'Failed to delete task');
+            }
             return;
         }
 
         if (action === 'UPDATE' && data) {
-            const updatedTask = { ...selectedTask, ...data };
-            dispatch(updateTask(updatedTask));
-            dispatch(addActivity({
-                type: 'updated',
-                message: `Updated task details: ${updatedTask.title}`,
-                user_id: auth.currentUser?.id || ''
-            }));
-            toast.success('Task updated successfully');
-            setIsModalOpen(false);
+            try {
+                const updatedTask = { ...selectedTask, ...data } as Task;
+                await dispatch(updateTaskAsync(updatedTask)).unwrap();
+                dispatch(addActivity({
+                    type: 'updated',
+                    message: `Updated task details: ${updatedTask.title}`,
+                    user_id: auth.currentUser?.id || ''
+                }));
+                toast.success('Task updated successfully');
+                setIsModalOpen(false);
+            } catch (error: any) {
+                toast.error(error || 'Failed to update task');
+            }
         }
     };
 

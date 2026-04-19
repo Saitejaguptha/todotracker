@@ -1,10 +1,10 @@
 import React from 'react';
 import { FiCheckCircle, FiClock, FiEdit2, FiTrash2, FiRotateCcw } from 'react-icons/fi';
 import { useDispatch, useSelector } from 'react-redux';
-import { type RootState } from '../../store';
-import { toggleTaskStatus, type Task } from '../../store/tasksSlice';
+import { toggleTaskStatusAsync, type Task } from '../../store/tasksSlice';
 import { addActivity } from '../../store/activitySlice';
 import { toast } from 'react-hot-toast';
+import { type RootState, type AppDispatch } from '../../store';
 
 interface TaskCardProps {
     task: Task;
@@ -16,7 +16,7 @@ interface TaskCardProps {
 }
 
 const TaskCard: React.FC<TaskCardProps> = ({ task, onEdit, onDelete, onClick, showActions = false, variant = 'default' }) => {
-    const dispatch = useDispatch();
+    const dispatch = useDispatch<AppDispatch>();
     const auth = useSelector((state: RootState) => state.auth);
     const userId = auth.currentUser?.id;
 
@@ -26,33 +26,45 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onEdit, onDelete, onClick, sh
         }
     };
 
-    const handleToggle = (e: React.MouseEvent) => {
+    const handleToggle = async (e: React.MouseEvent) => {
         e.stopPropagation();
         const newStatus = task.status === 'DONE' ? 'PENDING' : 'DONE';
-        dispatch(toggleTaskStatus(task.id));
-        dispatch(addActivity({
-            type: newStatus === 'DONE' ? 'completed' : 'pending',
-            message: `Task "${task.title}" marked as ${newStatus.toLowerCase()}`,
-            user_id: userId || ''
-        }));
-        toast.success(`Task marked as ${newStatus.toLowerCase()}`);
-    };
-
-    const handleMarkAsPending = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        if (task.status === 'DONE') {
-            dispatch(toggleTaskStatus(task.id));
-            dispatch(addActivity({ type: 'pending', message: `Task "${task.title}" moved back to pending`, user_id: userId || '' }));
-            toast.success('Task moved to pending');
+        try {
+            await dispatch(toggleTaskStatusAsync({ id: task.id, status: task.status })).unwrap();
+            dispatch(addActivity({
+                type: newStatus === 'DONE' ? 'completed' : 'pending',
+                message: `Task "${task.title}" marked as ${newStatus.toLowerCase()}`,
+                user_id: userId || ''
+            }));
+            toast.success(`Task marked as ${newStatus.toLowerCase()}`);
+        } catch (error: any) {
+            toast.error(error || 'Failed to update task status');
         }
     };
 
-    const handleMarkAsDone = (e: React.MouseEvent) => {
+    const handleMarkAsPending = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (task.status === 'DONE') {
+            try {
+                await dispatch(toggleTaskStatusAsync({ id: task.id, status: 'DONE' })).unwrap();
+                dispatch(addActivity({ type: 'pending', message: `Task "${task.title}" moved back to pending`, user_id: userId || '' }));
+                toast.success('Task moved to pending');
+            } catch (error: any) {
+                toast.error(error || 'Failed to update task status');
+            }
+        }
+    };
+
+    const handleMarkAsDone = async (e: React.MouseEvent) => {
         e.stopPropagation();
         if (task.status === 'PENDING') {
-            dispatch(toggleTaskStatus(task.id));
-            dispatch(addActivity({ type: 'completed', message: `Task "${task.title}" marked as completed`, user_id: userId || '' }));
-            toast.success('Task marked as completed!');
+            try {
+                await dispatch(toggleTaskStatusAsync({ id: task.id, status: 'PENDING' })).unwrap();
+                dispatch(addActivity({ type: 'completed', message: `Task "${task.title}" marked as completed`, user_id: userId || '' }));
+                toast.success('Task marked as completed!');
+            } catch (error: any) {
+                toast.error(error || 'Failed to update task status');
+            }
         }
     };
 

@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { useForm, type SubmitHandler } from 'react-hook-form';
 import { toast } from 'react-hot-toast';
 import { useDispatch, useSelector } from 'react-redux';
-import { addTask } from '../../store/tasksSlice';
+import { addTaskAsync } from '../../store/tasksSlice';
 import { addActivity } from '../../store/activitySlice';
-import { type RootState } from '../../store';
+import { type RootState, type AppDispatch } from '../../store';
 
 import { FiPlusCircle } from 'react-icons/fi';
 
@@ -15,7 +15,7 @@ type TaskFormInputs = {
 };
 
 const TaskForm: React.FC = () => {
-    const dispatch = useDispatch();
+    const dispatch = useDispatch<AppDispatch>();
     const auth = useSelector((state: RootState) => state.auth);
     const userId = auth.currentUser?.id;
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -31,21 +31,27 @@ const TaskForm: React.FC = () => {
         }
     });
 
-    const onSubmit: SubmitHandler<TaskFormInputs> = (data) => {
+    const onSubmit: SubmitHandler<TaskFormInputs> = async (data) => {
         if (!userId) {
             toast.error('You must be logged in to create tasks');
             return;
         }
 
         setIsSubmitting(true);
-        dispatch(addTask({
-            ...data,
-            user_id: userId
-        }));
-        dispatch(addActivity({ type: 'created', message: `Created new task: ${data.title} `, user_id: userId }));
-        toast.success('Task created successfully!');
-        reset();
-        setIsSubmitting(false);
+        try {
+            await dispatch(addTaskAsync({
+                ...data,
+                user_id: userId
+            })).unwrap();
+            
+            dispatch(addActivity({ type: 'created', message: `Created new task: ${data.title} `, user_id: userId }));
+            toast.success('Task created successfully!');
+            reset();
+        } catch (error: any) {
+            toast.error(error || 'Failed to create task');
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     return (

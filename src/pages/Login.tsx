@@ -5,10 +5,10 @@ import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { FiMail, FiLock, FiLogIn } from 'react-icons/fi';
 import { useDispatch, useSelector } from 'react-redux';
-import { signIn } from '../store/authSlice';
-import { loadUserTasks } from '../store/tasksSlice';
+import { signInUser } from '../store/authSlice';
+import { fetchTasks } from '../store/tasksSlice';
 import { loadUserActivities } from '../store/activitySlice';
-import { type RootState } from '../store';
+import { type RootState, type AppDispatch } from '../store';
 
 type LoginFormInputs = {
     email: string;
@@ -20,7 +20,7 @@ const Login: React.FC = () => {
     const auth = useSelector((state: RootState) => state.auth);
     const { loading: isLoading, currentUser } = auth;
     const isLoggedIn = !!currentUser;
-    const dispatch = useDispatch();
+    const dispatch = useDispatch<AppDispatch>();
     const pendingLoginRef = React.useRef(false);
 
     const {
@@ -41,8 +41,9 @@ const Login: React.FC = () => {
         if (!pendingLoginRef.current) return;
         if (auth.currentUser) {
             pendingLoginRef.current = false;
+            const userId = auth.currentUser.id;
             const email = auth.currentUser.email;
-            dispatch(loadUserTasks(email));
+            dispatch(fetchTasks(userId));
             dispatch(loadUserActivities(email));
             toast.success(`Welcome back, ${auth.currentUser.name}!`);
             navigate('/app/create');
@@ -50,11 +51,11 @@ const Login: React.FC = () => {
             pendingLoginRef.current = false;
             toast.error(auth.error, { icon: '🔒' });
         }
-    }, [auth.currentUser, auth.error, navigate]);
+    }, [auth.currentUser, auth.error, navigate, dispatch]);
 
     const onSubmit: SubmitHandler<LoginFormInputs> = (data) => {
         pendingLoginRef.current = true;
-        dispatch(signIn(data));
+        dispatch(signInUser(data));
     };
 
     return (

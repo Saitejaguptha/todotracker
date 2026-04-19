@@ -2,16 +2,16 @@ import React, { useState, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { toast } from 'react-hot-toast';
 import { FiSearch, FiTrash2 } from 'react-icons/fi';
-import { type RootState } from '../store';
-import { deleteTask, type Task } from '../store/tasksSlice';
+import { deleteTaskAsync, type Task } from '../store/tasksSlice';
 import { addActivity } from '../store/activitySlice';
+import { type RootState, type AppDispatch } from '../store';
 import TaskCard from '../components/features/TaskCard';
 import TaskModal from '../components/features/TaskModal';
 
 const DeleteTask: React.FC = () => {
     const tasks = useSelector((state: RootState) => state.tasks.items);
     const auth = useSelector((state: RootState) => state.auth);
-    const dispatch = useDispatch();
+    const dispatch = useDispatch<AppDispatch>();
     const { searchByDescription } = useSelector((state: RootState) => state.settings);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -33,15 +33,20 @@ const DeleteTask: React.FC = () => {
         setIsModalOpen(true);
     };
 
-    const handleAction = (action: string) => {
+    const handleAction = async (action: string) => {
         if (action === 'DELETE' && selectedTask) {
-            dispatch(deleteTask(selectedTask.id));
-            dispatch(addActivity({
-                type: 'deleted',
-                message: `Permanently deleted task: ${selectedTask.title}`,
-                user_id: auth.currentUser?.id || ''
-            }));
-            toast.error('Task deleted successfully');
+            try {
+                await dispatch(deleteTaskAsync(selectedTask.id)).unwrap();
+                dispatch(addActivity({
+                    type: 'deleted',
+                    message: `Permanently deleted task: ${selectedTask.title}`,
+                    user_id: auth.currentUser?.id || ''
+                }));
+                toast.error('Task deleted successfully');
+                setIsModalOpen(false);
+            } catch (error: any) {
+                toast.error(error || 'Failed to delete task');
+            }
         }
     };
 

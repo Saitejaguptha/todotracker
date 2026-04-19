@@ -2,16 +2,16 @@ import React, { useState, useMemo } from 'react';
 import { toast } from 'react-hot-toast';
 import { useSelector, useDispatch } from 'react-redux';
 import { FiSearch, FiEdit } from 'react-icons/fi';
-import { type RootState } from '../store';
-import { updateTask, type Task } from '../store/tasksSlice';
+import { updateTaskAsync, type Task } from '../store/tasksSlice';
 import { addActivity } from '../store/activitySlice';
+import { type RootState, type AppDispatch } from '../store';
 import TaskCard from '../components/features/TaskCard';
 import TaskModal from '../components/features/TaskModal';
 
 const EditTask: React.FC = () => {
     const tasks = useSelector((state: RootState) => state.tasks.items);
     const auth = useSelector((state: RootState) => state.auth);
-    const dispatch = useDispatch();
+    const dispatch = useDispatch<AppDispatch>();
     const { searchByDescription } = useSelector((state: RootState) => state.settings);
     const [searchQuery, setSearchQuery] = useState('');
     const [editingTask, setEditingTask] = useState<Task | null>(null);
@@ -33,16 +33,21 @@ const EditTask: React.FC = () => {
         setIsModalOpen(true);
     };
 
-    const handleAction = (action: string, data?: Partial<Task>) => {
+    const handleAction = async (action: string, data?: Partial<Task>) => {
         if (action === 'UPDATE' && editingTask && data) {
-            const updatedTask = { ...editingTask, ...data };
-            dispatch(updateTask(updatedTask));
-            dispatch(addActivity({
-                type: 'updated',
-                message: `Updated task details: ${updatedTask.title}`,
-                user_id: auth.currentUser?.id || ''
-            }));
-            toast.success('Task updated successfully');
+            try {
+                const updatedTask = { ...editingTask, ...data } as Task;
+                await dispatch(updateTaskAsync(updatedTask)).unwrap();
+                dispatch(addActivity({
+                    type: 'updated',
+                    message: `Updated task details: ${updatedTask.title}`,
+                    user_id: auth.currentUser?.id || ''
+                }));
+                toast.success('Task updated successfully');
+                setIsModalOpen(false);
+            } catch (error: any) {
+                toast.error(error || 'Failed to update task');
+            }
         }
     };
 

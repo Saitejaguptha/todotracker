@@ -1,39 +1,51 @@
 import { useSelector, useDispatch } from 'react-redux';
 import { FiCheckCircle, FiClock, FiTrash2, FiBell, FiSearch } from 'react-icons/fi';
 import { toast } from 'react-hot-toast';
-import { type RootState } from '../store';
 import {
-    markAllStatus,
-    deleteAll
+    markAllStatusAsync,
+    deleteAllTasksAsync
 } from '../store/tasksSlice';
 import { addActivity } from '../store/activitySlice';
 import { toggleSearchByDescription, updateNotificationPreference } from '../store/settingsSlice';
+import { type RootState, type AppDispatch } from '../store';
 
 const Settings: React.FC = () => {
-    const dispatch = useDispatch();
+    const dispatch = useDispatch<AppDispatch>();
     const auth = useSelector((state: RootState) => state.auth);
     const userId = auth.currentUser?.id;
     const { searchByDescription, notificationsEnabled } = useSelector((state: RootState) => state.settings);
 
-    const handleMarkAllCompleted = () => {
+    const handleMarkAllCompleted = async () => {
         if (!userId) return;
-        dispatch(markAllStatus({ userId, status: 'DONE' }));
-        dispatch(addActivity({ type: 'completed', message: 'Marked all tasks as completed', user_id: userId }));
-        toast.success('All tasks marked as completed!');
+        try {
+            await dispatch(markAllStatusAsync({ userId, status: 'DONE' })).unwrap();
+            dispatch(addActivity({ type: 'completed', message: 'Marked all tasks as completed', user_id: userId }));
+            toast.success('All tasks marked as completed!');
+        } catch (error: any) {
+            toast.error(error || 'Failed to mark all tasks as completed');
+        }
     };
 
-    const handleMarkAllPending = () => {
+    const handleMarkAllPending = async () => {
         if (!userId) return;
-        dispatch(markAllStatus({ userId, status: 'PENDING' }));
-        dispatch(addActivity({ type: 'pending', message: 'Marked all tasks as pending', user_id: userId }));
-        toast.success('All tasks marked as pending!');
+        try {
+            await dispatch(markAllStatusAsync({ userId, status: 'PENDING' })).unwrap();
+            dispatch(addActivity({ type: 'pending', message: 'Marked all tasks as pending', user_id: userId }));
+            toast.success('All tasks marked as pending!');
+        } catch (error: any) {
+            toast.error(error || 'Failed to mark all tasks as pending');
+        }
     };
 
-    const handleDeleteAll = () => {
+    const handleDeleteAll = async () => {
         if (!userId) return;
-        dispatch(deleteAll(userId));
-        dispatch(addActivity({ type: 'deleted', message: 'Deleted all tasks from the list', user_id: userId }));
-        toast.error('All tasks deleted successfully!');
+        try {
+            await dispatch(deleteAllTasksAsync(userId)).unwrap();
+            dispatch(addActivity({ type: 'deleted', message: 'Deleted all tasks from the list', user_id: userId }));
+            toast.error('All tasks deleted successfully!');
+        } catch (error: any) {
+            toast.error(error || 'Failed to delete all tasks');
+        }
     };
 
     const handleToggleSearch = () => {

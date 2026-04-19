@@ -1,17 +1,17 @@
 import React, { useState, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { type RootState } from '../store';
 import TaskCard from '../components/features/TaskCard';
 import TaskModal from '../components/features/TaskModal';
 import { FiCheckCircle, FiSearch } from 'react-icons/fi';
-import { toggleTaskStatus, type Task } from '../store/tasksSlice';
+import { toggleTaskStatusAsync, type Task } from '../store/tasksSlice';
 import { addActivity } from '../store/activitySlice';
 import { toast } from 'react-hot-toast';
+import { type RootState, type AppDispatch } from '../store';
 
 const CompletedTasks: React.FC = () => {
     const tasks = useSelector((state: RootState) => state.tasks.items);
     const auth = useSelector((state: RootState) => state.auth);
-    const dispatch = useDispatch();
+    const dispatch = useDispatch<AppDispatch>();
 
     const { searchByDescription } = useSelector((state: RootState) => state.settings);
     const [searchQuery, setSearchQuery] = useState('');
@@ -36,15 +36,19 @@ const CompletedTasks: React.FC = () => {
         setIsModalOpen(true);
     };
 
-    const handleAction = (action: string) => {
+    const handleAction = async (action: string) => {
         if (action === 'TOGGLE' && selectedTask) {
-            dispatch(toggleTaskStatus(selectedTask.id));
-            dispatch(addActivity({
-                type: 'updated',
-                message: `Marked task as pending: ${selectedTask.title}`,
-                user_id: auth.currentUser?.id || ''
-            }));
-            toast.success('Task marked as pending');
+            try {
+                await dispatch(toggleTaskStatusAsync({ id: selectedTask.id, status: selectedTask.status })).unwrap();
+                dispatch(addActivity({
+                    type: 'updated',
+                    message: `Marked task as pending: ${selectedTask.title}`,
+                    user_id: auth.currentUser?.id || ''
+                }));
+                toast.success('Task marked as pending');
+            } catch (error: any) {
+                toast.error(error || 'Failed to update task status');
+            }
         }
     };
 

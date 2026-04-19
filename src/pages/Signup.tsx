@@ -5,10 +5,10 @@ import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { FiMail, FiLock, FiUser, FiUserPlus, FiArrowLeft } from 'react-icons/fi';
 import { useDispatch, useSelector } from 'react-redux';
-import { signUp } from '../store/authSlice';
-import { loadUserTasks } from '../store/tasksSlice';
+import { signUpUser } from '../store/authSlice';
+import { fetchTasks } from '../store/tasksSlice';
 import { loadUserActivities } from '../store/activitySlice';
-import { type RootState } from '../store';
+import { type RootState, type AppDispatch } from '../store';
 
 type SignupFormInputs = {
     name: string;
@@ -20,7 +20,7 @@ type SignupFormInputs = {
 
 const Signup: React.FC = () => {
     const navigate = useNavigate();
-    const dispatch = useDispatch();
+    const dispatch = useDispatch<AppDispatch>();
     const auth = useSelector((state: RootState) => state.auth);
     const { loading: isLoading, currentUser } = auth;
     const isLoggedIn = !!currentUser;
@@ -50,8 +50,9 @@ const Signup: React.FC = () => {
         if (!pendingSignupRef.current) return;
         if (auth.currentUser) {
             pendingSignupRef.current = false;
+            const userId = auth.currentUser.id;
             const email = auth.currentUser.email;
-            dispatch(loadUserTasks(email));
+            dispatch(fetchTasks(userId));
             dispatch(loadUserActivities(email));
             toast.success('Account created! Welcome, ' + auth.currentUser.name);
             navigate('/app/create');
@@ -59,13 +60,13 @@ const Signup: React.FC = () => {
             pendingSignupRef.current = false;
             toast.error(auth.error, { icon: '⚠️' });
         }
-    }, [auth.currentUser, auth.error, navigate]);
+    }, [auth.currentUser, auth.error, navigate, dispatch]);
 
     const password = watch('password');
 
     const onSubmit: SubmitHandler<SignupFormInputs> = (data) => {
         pendingSignupRef.current = true;
-        dispatch(signUp({
+        dispatch(signUpUser({
             name: data.name,
             email: data.email,
             gender: data.gender,

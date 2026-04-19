@@ -1,4 +1,5 @@
-import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk, type PayloadAction } from '@reduxjs/toolkit';
+import { supabase } from '../lib/supabase';
 
 export interface Task {
     id: string;
@@ -13,97 +14,229 @@ interface TasksState {
     items: Task[];
     loading: boolean;
     error: string | null;
-    currentUserEmail: string | null;
+    loadedUserId: string | null;
 }
 
-// User-scoped key so different users on the same device never share data
-export const getTasksKey = (email: string) => `tasks_${email}`;
+// Helper to transform DB task to App task
+const transformTask = (dbTask: any): Task => ({
+    ...dbTask,
+    // Convert int8 id to string for consistency
+    id: String(dbTask.id),
+    user_id: String(dbTask.user_id),
+    // Map boolean status to PENDING/DONE strings
+    status: dbTask.status ? 'DONE' : 'PENDING'
+});
 
-const loadTasksForUser = (email: string): Task[] => {
-    const saved = localStorage.getItem(getTasksKey(email));
-    if (saved) {
-        try { return JSON.parse(saved); } catch { /* ignore */ }
+// Helper to transform App status to DB boolean
+const transformStatusToDB = (status: 'PENDING' | 'DONE'): boolean => status === 'DONE';
+
+// Async Thunks
+export const fetchTasks = createAsyncThunk(
+    'tasks/fetchTasks',
+    async (userId: string | number, { rejectWithValue }) => {
+        try {
+            const { data, error } = await supabase
+                .from('tasks')
+                .select('*')
+                .eq('user_id', userId)
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            return (data || []).map(transformTask);
+        } catch (error: any) {
+            return rejectWithValue(error.message);
+        }
     }
-    return [];
-};
+);
 
-const persistTasks = (items: Task[], email: string | null) => {
-    if (email) localStorage.setItem(getTasksKey(email), JSON.stringify(items));
-};
+export const addTaskAsync = createAsyncThunk(
+    'tasks/addTask',
+    async (task: Omit<Task, 'id' | 'created_at'>, { rejectWithValue }) => {
+        try {
+            const dbTask = {
+                title: task.title,
+                description: task.description,
+                status: transformStatusToDB(task.status),
+                user_id: task.user_id
+            };
+
+            const { data, error } = await supabase
+                .from('tasks')
+                .insert([dbTask])
+                .select()
+                .single();
+
+            if (error) throw error;
+            return transformTask(data);
+        } catch (error: any) {
+            return rejectWithValue(error.message);
+        }
+    }
+);
+
+export const updateTaskAsync = createAsyncThunk(
+    'tasks/updateTask',
+    async (task: Task, { rejectWithValue }) => {
+        try {
+            const { data, error } = await supabase
+                .from('tasks')
+                .update({ 
+                    title: task.title, 
+                    description: task.description, 
+                    status: transformStatusToDB(task.status) 
+                })
+                .eq('id', task.id)
+                .select()
+                .single();
+
+            if (error) throw error;
+            return transformTask(data);
+        } catch (error: any) {
+            return rejectWithValue(error.message);
+        }
+    }
+);
+
+export const deleteTaskAsync = createAsyncThunk(
+    'tasks/deleteTask',
+    async (taskId: string | number, { rejectWithValue }) => {
+        try {
+            const { error } = await supabase
+                .from('tasks')
+                .delete()
+                .eq('id', taskId);
+
+            if (error) throw error;
+            return String(taskId);
+        } catch (error: any) {
+            return rejectWithValue(error.message);
+        }
+    }
+);
+
+export const toggleTaskStatusAsync = createAsyncThunk(
+    'tasks/toggleTaskStatus',
+    async ({ id, status }: { id: string | number; status: 'PENDING' | 'DONE' }, { rejectWithValue }) => {
+        try {
+            const newStatus = status === 'DONE' ? 'PENDING' : 'DONE';
+            const { data, error } = await supabase
+                .from('tasks')
+                .update({ status: transformStatusToDB(newStatus) })
+                .eq('id', id)
+                .select()
+                .single();
+
+            if (error) throw error;
+            return transformTask(data);
+        } catch (error: any) {
+            return rejectWithValue(error.message);
+        }
+    }
+);
+
+export const markAllStatusAsync = createAsyncThunk(
+    'tasks/markAllStatus',
+    async ({ userId, status }: { userId: string | number; status: 'DONE' | 'PENDING' }, { rejectWithValue }) => {
+        try {
+            const { data, error } = await supabase
+                .from('tasks')
+                .update({ status: transformStatusToDB(status) })
+                .eq('user_id', userId)
+                .select();
+
+            if (error) throw error;
+            return (data || []).map(transformTask);
+        } catch (error: any) {
+            return rejectWithValue(error.message);
+        }
+    }
+);
+
+export const deleteAllTasksAsync = createAsyncThunk(
+    'tasks/deleteAll',
+    async (userId: string | number, { rejectWithValue }) => {
+        try {
+            const { error } = await supabase
+                .from('tasks')
+                .delete()
+                .eq('user_id', userId);
+
+            if (error) throw error;
+            return String(userId);
+        } catch (error: any) {
+            return rejectWithValue(error.message);
+        }
+    }
+);
 
 const initialState: TasksState = {
     items: [],
     loading: false,
     error: null,
-    currentUserEmail: null,
 };
 
 const tasksSlice = createSlice({
     name: 'tasks',
     initialState,
     reducers: {
-        /** Dispatched right after sign-in / sign-up */
-        loadUserTasks: (state, action: PayloadAction<string>) => {
-            state.currentUserEmail = action.payload;
-            state.items = loadTasksForUser(action.payload);
-        },
-        /** Dispatched on logout */
         unloadUserTasks: (state) => {
             state.items = [];
-            state.currentUserEmail = null;
-        },
-        addTask: (state, action: PayloadAction<Omit<Task, 'id' | 'created_at'>>) => {
-            const newTask: Task = {
-                ...action.payload,
-                id: crypto.randomUUID(),
-                created_at: new Date().toISOString()
-            };
-            state.items.unshift(newTask);
-            persistTasks(state.items, state.currentUserEmail);
-        },
-        updateTask: (state, action: PayloadAction<Task>) => {
-            const index = state.items.findIndex(t => t.id === action.payload.id);
-            if (index !== -1) {
-                state.items[index] = action.payload;
-                persistTasks(state.items, state.currentUserEmail);
-            }
-        },
-        deleteTask: (state, action: PayloadAction<string>) => {
-            state.items = state.items.filter(t => t.id !== action.payload);
-            persistTasks(state.items, state.currentUserEmail);
-        },
-        toggleTaskStatus: (state, action: PayloadAction<string>) => {
-            const index = state.items.findIndex(t => t.id === action.payload);
-            if (index !== -1) {
-                state.items[index].status = state.items[index].status === 'DONE' ? 'PENDING' : 'DONE';
-                persistTasks(state.items, state.currentUserEmail);
-            }
-        },
-        markAllStatus: (state, action: PayloadAction<{ userId: string; status: 'DONE' | 'PENDING' }>) => {
-            state.items = state.items.map(t =>
-                t.user_id === action.payload.userId ? { ...t, status: action.payload.status } : t
-            );
-            persistTasks(state.items, state.currentUserEmail);
-        },
-        deleteAll: (state, action: PayloadAction<string>) => {
-            state.items = state.items.filter(t => t.user_id !== action.payload);
-            persistTasks(state.items, state.currentUserEmail);
+            state.loadedUserId = null;
         },
         clearTasksError: (state) => {
             state.error = null;
         }
+    },
+    extraReducers: (builder) => {
+        builder
+            // Fetch Tasks
+            .addCase(fetchTasks.pending, (state) => {
+                state.loading = true;
+            })
+            .addCase(fetchTasks.fulfilled, (state, action) => {
+                state.loading = false;
+                state.items = action.payload;
+                state.loadedUserId = action.meta.arg; // The userId passed to fetchTasks
+            })
+            .addCase(fetchTasks.rejected, (state, action) => {
+                state.loading = false;
+                state.error = action.payload as string;
+            })
+            // Add Task
+            .addCase(addTaskAsync.fulfilled, (state, action) => {
+                state.items.unshift(action.payload);
+            })
+            // Update Task
+            .addCase(updateTaskAsync.fulfilled, (state, action) => {
+                const index = state.items.findIndex(t => t.id === action.payload.id);
+                if (index !== -1) {
+                    state.items[index] = action.payload;
+                }
+            })
+            // Delete Task
+            .addCase(deleteTaskAsync.fulfilled, (state, action) => {
+                state.items = state.items.filter(t => t.id !== action.payload);
+            })
+            // Toggle Status
+            .addCase(toggleTaskStatusAsync.fulfilled, (state, action) => {
+                const index = state.items.findIndex(t => t.id === action.payload.id);
+                if (index !== -1) {
+                    state.items[index] = action.payload;
+                }
+            })
+            // Mark All Status
+            .addCase(markAllStatusAsync.fulfilled, (state, action) => {
+                state.items = action.payload;
+            })
+            // Delete All
+            .addCase(deleteAllTasksAsync.fulfilled, (state) => {
+                state.items = [];
+            });
     }
 });
 
 export const {
-    loadUserTasks,
     unloadUserTasks,
-    addTask,
-    updateTask,
-    deleteTask,
-    toggleTaskStatus,
-    markAllStatus,
-    deleteAll,
     clearTasksError
 } = tasksSlice.actions;
 
