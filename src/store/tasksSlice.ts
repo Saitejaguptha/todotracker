@@ -1,4 +1,4 @@
-import { createSlice, createAsyncThunk, type PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { supabase } from '../lib/supabase';
 
 export interface Task {
@@ -173,6 +173,7 @@ const initialState: TasksState = {
     items: [],
     loading: false,
     error: null,
+    loadedUserId: null,
 };
 
 const tasksSlice = createSlice({
@@ -196,7 +197,7 @@ const tasksSlice = createSlice({
             .addCase(fetchTasks.fulfilled, (state, action) => {
                 state.loading = false;
                 state.items = action.payload;
-                state.loadedUserId = action.meta.arg; // The userId passed to fetchTasks
+                state.loadedUserId = String(action.meta.arg); // The userId passed to fetchTasks
             })
             .addCase(fetchTasks.rejected, (state, action) => {
                 state.loading = false;
